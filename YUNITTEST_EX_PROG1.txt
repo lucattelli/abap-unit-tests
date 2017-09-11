@@ -1,0 +1,19 @@
+report yunittest_ex_prog1.
+
+*&---------------------------------------------------------------------*
+*& Form get_mat_classes_valid
+*&---------------------------------------------------------------------*
+FORM get_mat_classes_valid changing ok.
+
+  ok = 'X'.
+
+endform. "get_mat_classes_valid
+
+*&---------------------------------------------------------------------*
+*& Form get_mat_classes_invalid
+*&---------------------------------------------------------------------*
+FORM get_mat_classes_invalid changing ok.
+
+*  ok = 'X'.
+
+endform. "get_mat_classes_invalid

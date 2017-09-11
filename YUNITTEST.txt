@@ -1,0 +1,199 @@
+
+report yunittest.
+
+* Declaração de tipos.
+types: begin of ty_source,
+line(72),
+end of ty_source.
+
+types: begin of ty_forms,
+formname(30),
+end of ty_forms.
+
+
+* Declaração de WA para testes unitários.
+data gw_unit_tests type yunittest.
+data gt_unit_tests type table of yunittest.
+
+* Tela de seleção.
+selection-screen begin of block b1.
+parameters p_doit type flag as checkbox.
+parameters p_debug type flag as checkbox.
+selection-screen end of block b1.
+
+start-of-selection.
+
+  perform get_tests tables gt_unit_tests using p_doit.
+
+  loop at gt_unit_tests into gw_unit_tests.
+    perform run_tests using p_doit p_debug gw_unit_tests-progn.
+  endloop.
+
+*&---------------------------------------------------------------------*
+*& Form get_tests
+*&---------------------------------------------------------------------*
+form get_tests tables table_return structure yunittest using i_doit.
+
+  data lw_unit_tests type yunittest .
+  data lt_unit_tests type table of yunittest .
+
+  select * from yunittest
+  into table lt_unit_tests
+  where active eq 'X'.
+
+  move lt_unit_tests[] to table_return[].
+
+endform. "get_tests
+
+*&---------------------------------------------------------------------*
+*& Form run_tests
+*&---------------------------------------------------------------------*
+form run_tests using i_doit i_debug i_prog.
+
+  data lw_forms type ty_forms.
+  data lt_forms type table of ty_forms.
+
+  data lv_perc type i.
+  data lv_log_out type string.
+
+  if not i_doit is initial.
+    perform read_report tables lt_forms using i_prog.
+    if not lt_forms[] is initial.
+      new-line.
+
+      move 'Tests Pool: 'to lv_log_out.
+
+      concatenate lv_log_out '.........................................'
+      into lv_log_out.
+
+      write at / lv_log_out(50).
+
+      write i_prog.
+
+      new-line. new-line.
+
+    endif.
+    loop at lt_forms into lw_forms.
+      perform get_perc tables lt_forms using sy-tabix changing lv_perc.
+      perform do_splash using lw_forms-formname i_prog lv_perc.
+      perform do_test using lw_forms-formname i_prog i_debug.
+    endloop.
+  endif.
+endform. "run_tests
+
+*&---------------------------------------------------------------------*
+*& Form read_report
+*&---------------------------------------------------------------------*
+form read_report tables table_forms using i_program.
+
+  data lt_source type standard table of ty_source
+  with non-unique default key initial size 500.
+
+  data lt_forms type table of ty_forms.
+
+  data lw_forms type ty_forms.
+
+  data lw_source type ty_source.
+
+  data lv_dummy type string.
+
+  read report i_program into lt_source.
+
+  check sy-subrc is initial.
+
+  loop at lt_source into lw_source.
+    condense lw_source.
+    if lw_source-line(4) = 'FORM'.
+      clear lw_forms.
+      split lw_source-line at space into lv_dummy lw_forms-formname.
+      split lw_forms-formname at space into lw_forms-formname lv_dummy.
+      translate lw_forms-formname to upper case.
+      append lw_forms to lt_forms.
+    endif.
+  endloop.
+
+  table_forms[] = lt_forms[].
+
+endform. "read_report
+
+*&---------------------------------------------------------------------*
+*& Form check_result
+*&---------------------------------------------------------------------*
+form check_result using i_form_name i_flag_ok.
+
+  data lv_log_out type string.
+
+  new-line.
+
+  concatenate 'Testing:' i_form_name
+  into lv_log_out separated by space.
+
+  concatenate lv_log_out '.........................................'
+  into lv_log_out.
+
+  write at / lv_log_out(50).
+
+  if i_flag_ok is initial.
+    write 'ERRO.' color 6.
+  else.
+    write 'OK.' color 5.
+  endif.
+
+endform. "check_result
+
+*&---------------------------------------------------------------------*
+*& Form do_test
+*&---------------------------------------------------------------------*
+form do_test using i_form_name i_prog_name i_debug.
+
+  data lv_ok type flag.
+  data lv_form_name type string.
+  data lv_prog_name type string.
+
+  lv_ok = space.
+  lv_form_name = i_form_name.
+  lv_prog_name = i_prog_name.
+
+  if not i_debug is initial.
+    break-point.
+  endif.
+
+  perform (lv_form_name) in program (lv_prog_name) changing lv_ok.
+
+  perform check_result using lv_form_name lv_ok.
+
+endform. "do_test
+
+*&---------------------------------------------------------------------*
+*& Form do_splash
+*&---------------------------------------------------------------------*
+form do_splash using i_form_name i_prog_name i_percentage.
+
+  data lv_text type string.
+
+  concatenate 'Testing:' i_form_name 'in program' i_prog_name
+  into lv_text
+  separated by space.
+
+  call function 'SAPGUI_PROGRESS_INDICATOR'
+    exporting
+      percentage = i_percentage
+      text       = lv_text.
+
+endform. "do_splash
+
+*&---------------------------------------------------------------------*
+*& Form get_perc
+*&---------------------------------------------------------------------*
+form get_perc tables table_forms
+using actual_index
+changing return_perc.
+
+  data lt_forms type table of ty_forms.
+  data lv_descr type i.
+
+  move table_forms[] to lt_forms[].
+  describe table lt_forms lines lv_descr.
+  return_perc = ( actual_index * 100 ) / lv_descr.
+
+endform. "get_perc
